@@ -1,13 +1,11 @@
-from django.views.generic import (View, ListView, DetailView,
-                                  FormView, CreateView)
-
-from django.http import JsonResponse, Http404
 from django.db.models import Count
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect
+from django.views.generic import (CreateView, DetailView, FormView, ListView, View)
 
-from .models import Article, Like, Comment
-from .forms import (CommentForm, CommentLikeForm, EditCommentForm,
-                    DeleteCommentForm, ArticleLikeForm)
+from .forms import (ArticleLikeForm, CommentForm, CommentLikeForm, DeleteCommentForm, EditCommentForm)
+# советуют использовать полный путь, в твоем случае `from blog.models import Article, Like, Comment`
+from .models import Article, Comment, Like
 
 
 class AjaxableResponseMixin:
@@ -33,6 +31,7 @@ class AjaxableFormResponseMixin(AjaxableResponseMixin):
         if self.request.is_ajax():
             return super().response({'errors': form.get_errors()})
         else:
+            # почему райзится 404 ошибка, если не аякс запрос то выдаст непонятную ошибку
             raise Http404()
 
     def form_valid(self, form):
@@ -51,8 +50,14 @@ class ArticleListView(ListView):
         # collect all articles for page
         articles = Article.objects.order_by('-pub_date').annotate(likes_count=Count('like')).all()
         # find all likes for that list
+
+        # можно так, но надо учесть что это буде сделано как вложенный запрос
+        # user_likes = Like.objects.filter(article=articles, user=self.request.user).values_list('article_id', flat=True)
         user_likes = Like.objects.filter(article_id__in=[article.id for article in articles], user=self.request.user).\
             values_list('article_id', flat=True)
+
+        # как вариант перенести этот цикл в шаблон, там тоже можно сделать {% if article.id in user_likes %}
+        # так откажешься от одного цикла.
         for article in articles:
             setattr(article, 'is_liked', article.id in user_likes)
 
@@ -65,6 +70,7 @@ class ArticleDetailView(DetailView):
     context_object_name = 'article'
 
     def get_context_data(self, **kwargs):
+        # метод не нужен текущий user по умолчанию уже есть в контексте шаблона
         context = super(ArticleDetailView, self).get_context_data(**kwargs)
         context['user'] = self.request.user
         return context
@@ -73,14 +79,15 @@ class ArticleDetailView(DetailView):
 class CommentsView(AjaxableResponseMixin, View):
 
     def get_object(self, queryset=None):
+        # по теории выдаст ошибку потому что ожидается объект а не id
         return Comment.objects.filter(article=self.kwargs['pk']).order_by('-pub_date')
 
     def get(self, request, *args, **kwargs):
-
         return super().response(self.get_data())
 
     def get_data(self):
         comments = {}
+        # не понял зачем этот код вообще ты из массива делаешь точно такой же массив
         i = 0
         obj = self.get_object()
         for comment in obj:
@@ -95,6 +102,7 @@ class LikesView(AjaxableResponseMixin, View):
 
     def get_object(self, queryset=None):
         count_likes = Article.objects.get(pk=self.kwargs['pk']).like_set.count()
+        # по теории выдаст ошибку потому что ожидается объект а не id
         is_liked = Like.objects.filter(article=self.kwargs['pk'], user=self.request.user).exists()
         return {'count_likes': count_likes,
                 'is_liked': is_liked}
@@ -138,6 +146,7 @@ class CommentLikeCreateView(AjaxableFormResponseMixin, CreateView):
     def form_valid(self, form):
         like, created = Like.objects.get_or_create(comment=form.cleaned_data.get('comment'), user=self.request.user)
         if not created:
+            # смысл удалять запись если она уже есть
             like.delete()
         return super(CommentLikeCreateView, self).form_valid(form)
 

@@ -3,6 +3,8 @@ from django.test import TestCase
 from .models import Article
 
 
+# тестирование практически ничего не тестирует
+
 class ArticleMethodTests(TestCase):
 
     @classmethod
@@ -13,6 +15,8 @@ class ArticleMethodTests(TestCase):
         cls.articles.append(Article(pub_date='2018-02-13 18:18:13'))
         cls.articles.append(Article(pub_date='2018-02-13 18:20:26'))
 
+        # цикл не нужен
+        # Article.objects.bulk_create(cls.articles)
         for article in cls.articles:
             article.save()
 

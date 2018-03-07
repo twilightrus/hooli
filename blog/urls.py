@@ -7,6 +7,8 @@ app_name = "blog"
 
 urlpatterns = [
     path('', ArticleListView.as_view(), name='index'),
+    # раз уж используешь django 2.0 используй простые решения
+    # url('<int:pk>/', ArticleDetailView.as_view(), name='detail'),
     url(r'^(?P<pk>[0-9]+)/$', ArticleDetailView.as_view(), name='detail'),
     url(r'^(?P<pk>[0-9]+)/comments/', CommentsView.as_view(), name='comments_get'),
     url(r'^(?P<pk>[0-9]+)/likes/', LikesView.as_view(), name='likes_get'),
